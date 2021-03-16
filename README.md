@@ -41,7 +41,7 @@ interfaceMemberService
 
 ```
 
-TestCode
+**TestCode**
 
 ```javascript
 class MemberServiceTest {
@@ -97,49 +97,30 @@ cf.할인정책(둘 중 변경이 있을 수 있으므로 둘다 만든 후 테�
 **인터페이스 생성**
 
 ```javascript
-public
-interface
-orderService
+public interface orderService
 {
-    Order
-    createOrder(Long
-    memberId, String
-    itemName, int
-    itemPrice
-)
-    ;
+    Order createOrder(Long memberId, String itemName, int itemPrice);
 }
 // 실제 orderserviceImpl
-public
-
-class orderServiceImpl implements orderService {
-    private final
-    MemberRepository
-    memberRepository = new memoryMemberRepository();
-    private final
-    discountPolicy
-    discountPolicy = new FixDiscountPolicy();
-    private final
-    discountPolicy
-    discountPolicy = new rateDiscountPolicy();
-=>
-    구체클래스들에게
-    의존
-    OCP위반
+public class orderServiceImpl implements orderService {
+    private final MemberRepository memberRepository = new memoryMemberRepository();
+    private final discountPolicy discountPolicy = new FixDiscountPolicy();
+    private final discountPolicy discountPolicy = new rateDiscountPolicy();
+// => 구체클래스들에게 의존 OCP위반
 .
 
     @Override
     public Order
 
-    createOrder(Long
+  createOrder(Long
 
-    memberId
+  memberId
 ,
-    String
-    itemName
+  String
+  itemName
 ,
-    int
-    itemPrice
+  int
+  itemPrice
 ) {
 
     Member
@@ -290,7 +271,196 @@ Appconfig 라는 외부 클래스를 통해 생성자를 주입받으며 직접�
 - <u>OCP</u>:
     - **의존 관계를 직접 변경하지않는다.(클라이언트 코드에 주입하므로)**
     - **확장하여도 사용 영역의 변경은 닫혀 있게 된다.**
+  
 
+## 의존관계 주입
+  - 애플리케이션이 실행시점에 외부에서 구현체들을 생성하고 클라이언트에 전달해서 클라이언트와 서버의 실제 
+    의존 관계가 연결되는 것을 의존관계 주입이라고 한다.
+  - 객체 인스턴스를 생성, 그 참조값을 전달.
+  - 의존관계 주입을 사용하면 <d style="color:cornflowerblue"> 클라이언트 코드를 변경하지 않고, 클라이언트가 호출하는 대상의 타입 인스턴스를 변경할 수 있다.
+  - 의존관계 주입을 사용하면 정적 클래스 의존관계를 변경하지 않고 **<d style="color:cornflowerblue">동적인 객체 인스턴스 의존관계를 쉽게 변경할 수 있다.</P>**
+
+## Ioc 컨테이너, DI 컨테이너
+  - appConfig 처럼 객체를 생성하고 관리하면서 의존 관계를 연결해 주는 것이 IoC컨테이너 또는 DI 컨테이너라 한다.
+  - 또는 어셈블러, 오브젝트 팩토리라고 칭한다.
+
+
+--- --- 
+
+# 스프링 전환
+
+```javascript
+// 실제 동작에 필요한 "구현객체를 생성"
+@Configuration
+public class AppConfig_DI {
+    // 스프링 빈 저장소 IOC 컨테이너.
+    @Bean
+    public MemberService memberService(){
+        System.out.println("AppConfig_DI.memberService");
+        return new MemberServiceImpl(memberRepository()); // 생성자 주입 DIP 원칙 준수
+    }
+
+    @Bean
+    public MemberRepository memberRepository() {
+        System.out.println("AppConfig_DI.memberRepository");
+        return new memoryMemberRepository();
+    }
+
+    @Bean
+    public orderService orderService(){
+
+        System.out.println("AppConfig_DI.orderService");
+        return new orderServiceImpl(memberRepository(), discountPolicy());
+    }
+
+    @Bean
+    public discountPolicy discountPolicy(){
+        return new rateDiscountPolicy();
+    }
+}
+```
+
+
+**이전에  @Configuration(구성) , @Bean 이런 애노테이션을 붙이기 이전에는 컨테이너의 역할이 무엇인지 알기위해 순수 자바 코드로만 작성한 것이였다.**<br><br>
+**이제는 스프링에서 제공해주는 컨테이너 라는 것을  @Configuration(구성) 이 애노테이션을 붙여줌으로써 비로서 스프링에서 제공하는 컨테이너가 되는 것이다.**
+
+**이전에는 AppConfig를 통해 조회했지만, 이제는 스프링 컨테이너에 객체를 스프링 빈으로 등록하고, 컨테이너 안에서 빈을 찾아 사용하도록 변경되었다.**
+<br>
+
+> @Configuration(구성) , @Bean 애노테이션을 붙여준다.
+> 
+>   ※ 빈이란 ?
+>     스프링 컨테이너에 등록된 객체를 스프링 빈이라고 한다.    
+> 
+> 각 서비스들은 컨테이너인 pplicationConText객체를 생성하여 app.getBean(빈 메소드명,빈 빈 객체 타입)을 통해 직접 주입 받을 수 있다.
+
+
+## 컨테이너의 생성 동작 원리(그림 설명)
+
+### 1. 생성
+![캡처](https://user-images.githubusercontent.com/67587446/111299739-a4e94e80-8693-11eb-877b-dffedc633f65.PNG)
+
+애노테이션을 붙인 후 AppConfig class 컨테이너로서 스프링 빈 저장소를 가지고 있게 된다.
+
+### 빈 등록
+![캡처](https://user-images.githubusercontent.com/67587446/111300158-1cb77900-8694-11eb-8f89-01c0fff3cfb2.PNG)
+
+### 빈 의존관계 설정 - 준비
+
+![z](https://user-images.githubusercontent.com/67587446/111300391-5f795100-8694-11eb-921b-bd92eb31fc81.PNG)
+
+### 의존관계 설정 - 완료
+![캡처](https://user-images.githubusercontent.com/67587446/111300577-951e3a00-8694-11eb-9076-b1184c436920.PNG)
+
+###빈 조회 방법
+  ac.getBean("빈이름","객체 타입(인터페이스 타입 또는 구체 타입)")
+  - 이름과 타입으로 조회
+    - 이름 조회
+    - 타입 조회
+  - 상속관계 에서의 빈 조회.
+    - 부모 타입으로 조회시 자식 타입 또한 함께 조횐된다.
+    - 자식이 둘 이상이면 NoUniqueBeanDefinitionException 오류가 난다.(구체 타입으로 조히 권고))
+  
+## BeanFactory 와 ApplicationContext 관계( 둘 다 컨테이너)
+    BeanFactory > ApplicationContext
+
+  - ApplicationContext 는 BeanFactory의 자식이다.
+  - ApplicationContext 에서 사용한 getBean은 BeanFactory 에서 물려받은 기능이다.
+  - ApplicationContext 는 BeanFactory의 외 다양한 IFS 들을 가지고 있다.
+  - 애플리케이션을 개발할 때는 빈을 관리하고 조회하는 기능 외에 수많은 부가 기능이 필요하다.
+    - 메시지 소스 활용(국제화 기능)
+    - 환경 변수
+    - 애플리케이션 이벤트
+    - 편리한 리소스 조회
+  
+## 스프링 빈 설정 메타 정보 -BeanDefinition
+  - 다양한 형태의 설정 정보를 BeanDefinition으로 추상화 해서 사용한다.
+  - info
+    - BeanClassName
+    - factoryBeanName
+    - factoryMethodName
+    - Scope : singlton(Default)
+    - lazyInit : 실제 빈을 사용할 때 까지 최대한 생성을 지연 처리.
+    - initMethodName : 빈 생성 -> 읜존관계 적용 뒤에 호출되는 초기화 메서드 명
+    - DestoryMethodNam : 빈의 생명주기가 끝나서 제거하기 직전에 호출되는 메서드 명
+    - Constructor arguments, Properties : 의존관계 주입에서 사용
+  
+
+
+--- ---
+# 싱글톤 컨테이너
+
+    문제점
+    처음 순수하게 컨테이너 역할을 한 AppConfig (어노테이션이 없는) 는 한 고객의 요청 마다 객체를 새로 생성한다.
+    
+**해결 : 하나의 객체를 공유하여 사용하도록 설계한다.(싱글톤 패턴)**
+
+
+## 싱글톤 패턴
+  싱글톤이란?
+  > 클래스의 인스턴스가 딱 1개만 생성되는 것을 보장하는 디자인 패턴이다.
+  > 2개이상의 인스턴스 생성을 못하도록 private으로 생성자를 선언한다(new 사용 못하도록)
+```javascript
+
+public class singletonService   {
+    private static final  singletonService ins=new singletonService(); // 자기 자신 내부에 private 에 하나 static 하나에 올라옴
+
+    // 조횟 사용
+    public static  singletonService getIns(){
+        return ins;
+    }
+
+     private singletonService() {
+    }
+
+    public void logic(){}
+    {
+        System.out.println("싱글톤 객체 로직 호출.");
+    }
+}
+```
+
+private 을 통해 new를 막아 놓았다. 
+
+
+```javascript
+ @Test
+    @DisplayName("싱글톤 패턴 적용하는 객체 사용")
+    void singleTonService()
+    {
+//        new singletonService();컴파일 오류
+        singletonService s1=singletonService.getIns();
+        singletonService s2=singletonService.getIns();
+        singletonService s3=singletonService.getIns();
+
+        System.out.println(s1);
+        System.out.println(s2);
+        System.out.println(s3);
+        Assertions.assertThat(s1).isSameAs(s2);
+        Assertions.assertThat(s2).isSameAs(s3);
+        Assertions.assertThat(s1).isSameAs(s3);
+
+
+    }
+
+```
+
+
+**몇 개를 생성해도 같은 객체이다.**
+
+싱글톤 패턴을 적용하여 수 많은 고객의 요청이 올 때마다 객체를 생성하는 것이 아닌 이미 만들어진 객체를
+공유해서 효울적으로 사용할 수 있다. 하지만 싱글톤 패턴은 다음과 같은 수 많은 문제점들을 가지고 있다.
+
+
+<div style="color: indianred">
+구현코드 자체가 많다.<br>
+클라이언트가 구체 클래스에 의존한다. ex) singletonService.getIns();<br>
+구체 클래스의 의존으로 OCP 위반할 가능성이 있다.
+테스트 하기 복잡하다
+내부 속성 변경 초기화가 어렵다
+private 생성자로 자식 클래스 만들기가
+</div>
+  
 
 
 

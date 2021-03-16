@@ -38,6 +38,4 @@ public class AppConfig_DI {
     public discountPolicy discountPolicy(){
         return new rateDiscountPolicy();
     }
-
-
 }

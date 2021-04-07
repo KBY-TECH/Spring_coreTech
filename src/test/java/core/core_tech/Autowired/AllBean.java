@@ -38,7 +38,7 @@ public class AllBean {
         public DiscountService(Map<String, discountPolicy> policyMap, List<discountPolicy> list) {
             this.policyMap = policyMap;
             this.list = list;
-            System.out.println("policyMap = " + policyMap + "," +
+            System.out.println("policyMap = " + policyMap.keySet() + "," +policyMap.values() +","+
                     " list = " + list);;
         }
         public int discount(Member member,int price,String discountCode)

@@ -819,14 +819,116 @@ __생성자는 안전하고 순수 자바 언어의 특징을 잘 살리는 방�
 - 가장 권장하는 방법.
 - 스프링에 종속적인 기술이 아니라 자바 표준이므로 스프링이 아닌 다른 컨테이너에서 동작한다.
 - 외부 라이브러리에 적용하지는 못하는 단점을 가지므로, 외부 라이브러리 초기화,종료는 @Bean기능을 이용해야 한다.
+  <br><br>  
+
+
+
+# 빈 스코프
+
+-------
+지금까지의 스프링 빈이 스프링 컨테이너의 시작과 함께 생성되어 종료될때까지 유지되었다.<br>
+기본적으로 싱글톤 스코프로 생성되기 때문이다.
+> 스코프는 빈이 존재할 수 있는 <u>범위</u> 이다.
+
+### 스코프의 종류
+
+- 싱글톤 : Default 스코프이고, 컨테이너 시작과 종료까지 유지되는 가장 넓은 범위이다.
+- 프로토타입 : 프로토타입의 빈 생성, 의존관계 주입까지만 해주고 더는 관리 밖의 범위가 되는 매우 짧은 범위의 스코프이다.
+- 웹 관련 스코프
+    - request : 웹 요청을 시작으로 나갈때까지 유지.
+    - session : 웹 세션이 생성 되고 종료될 때 까지 유지되는 스코프
+    - application : 웹의 서블릿 컨텍스와 같은 범위로 유지
     
+**@Scope("prototype") 으로 프로토타입의 스코프로 변경 할 수 있다.**
 
 
+[싱글톤]
+
+![singleton](https://user-images.githubusercontent.com/67587446/113865639-4709db80-97e7-11eb-8798-dcb094ceb809.PNG)
+
+[프로토타입]
+
+![prototype](https://user-images.githubusercontent.com/67587446/113865647-48d39f00-97e7-11eb-987e-9ee77ea59be6.PNG)
+
+프로토타입의 스코프는 초기화 소멸 부분의 콜백 함수중에 소멸되는 부분은 호출되지 않는다. <br>
+왜냐하면 빈의 생성, 의존관계 주입, 초기화 설정으로 한 후 컨테이너의 손아귀에서 벗어나기 때문이다. <br>
+그리고 여러 요청에 따라 기능을 공유하지 않고 객체마다 새로운 주소를 부여하면서 새로 생성한다.
+
+-  프로토타입 빈은 프로토타입 빈을 조회한 클라이언트가 관리해야 한다.
+- 종료에 대한 호출은 클라이언트가 직접 해야 한다.
 
 
+## 프로토타입이 싱글톤 스코프 함께 사용시 문제점.
+    프로토타입 : 요청 할 때마다 항상 새로운 개체 인스턴스를 생성해서 반환.
+      싱글톤   : 요청 할 때마다 항상 똑같은 개체 인스턴스를 반환.
+
+
+### 프로토타입 빈을 호출 시 필드의 변화.
+> 클라이언트가 스프링 컨테이너에 있는 프로토타입 빈을 요청 시 <u> (인스턴스 0x1)</u>, count 필드가 존재하고 addCount를 호출한다.
+> 그러면 count=0에서 count=1을 반환.
+> 또 다른 클라이언트가 프로토타입 빈을 요청 시 count=0 에서 count 는 1로 된다.<u>( 인스턴스 0x2)</u>
     
+### 싱글톤 빈에서 프로토타입 빈 사용시 필드 변화.
+> 싱글톤 빈안에 있는 프로토타입 빈이 계속 새로 생성되기를 예상하면서 여러 클라이언트의 요청으 addCount메소드가 호출되어 각 새로만들어진
+> 프로토타입 빈에 있는 필드는 각 1이 될 것으로 예상하였다. 하지만 프로토타입 빈은 이미 생성시점에 주입이 완료된 후 컨테이너의 관리에서 벗어나 이미
+> 프로토타입빈이 최초 주입 시 그대로 유지되기 때문에 다른 클라이언트에 의한 요청에서 프로토타입 빈의 필드값은 각 요청마다 1이 증가하게 된다.
+ 
+※ 지금 시점에서 필요한 것은 싱글톤 빈이 프로토타입을 사용할 때 마다 스프링 컨테이너에게 새로 요청하는 방법이 필요.<br>
+직접 ApplicationContext를 DI받아 사용할 수 있지만 코드가 매우 지저분하다. 스프링과 자바 표준에서 제공해주는 라이브러리가 분명 있을 것이다.<br>
+<p style="color: dodgerblue">
+그 역할은 DI가 아닌 DL(Dependency LookUp)이라는 것이다.
+</p>
 
 
+
+### 싱글톤 빈에서 프로토타입 빈 사용시 문제점 해결.(DL의 역할은 하는 Provider,Factory)
+<u>DL이란</u>
+- 외부에서 주입 받는 것이 아닌 직접 필요한 의존관계를 찾는 것은 DL이라고 한다.(의존 관계 조회(탐색))
+
+`objectFactory ,objectProvide 사용.`
+- 두가지의 공통점
+  - 스프링에 의존적이다.
+  <br>
+- 두가지의 차이 
+  - objectFactory는 getBean을 통해 DL을 제공하고 Provider는 get을 통해 DL을 제공한다. 
+  - Provider는 objectFactory를 상속받았으므로 DL의 기능인 get()메소드 외에 다른 다양한 편의기능을 제공한다는 것에 차이가 있다.
+    
+```javascript
+@Scope("singleton")
+    @RequiredArgsConstructor
+    static class ClientBean{
+        private final ObjectProvider<prototypeTest> prototypeTests; // getObject 메소드 하나만 제공.
+        private final ObjectFactory<prototypeTest> prototypeTests2; // getObejct 기능의 get()메소드 외 다양하게 제공.
+        
+        @PostConstruct
+        public void init(){
+            System.out.println("single.init");
+        }
+
+        public int logic()
+        {
+            prototypeTest prototypeTest=prototypeTests.get();
+            prototypeTest.addCount();
+            return prototypeTest.getCount();
+        }
+        @PreDestroy
+        public void close(){
+            System.out.println("single.close");
+        }
+    }
+```
+
+<u>JSR-330 Provider </u>
+ - javax.inject.Provider라는 자바 표준을 사용하는 방법이다.
+ - 스프링에 의존적이지 않다. 
+ - gradle에 추가를 해야한다.`implementation \'javax.inject:javax.inject:1\'<br>
+ - 사용 방법 <br> 
+`ex: private final Provider<prototypeTest> prototypeTestProvider;`
+
+
+<p style="color: dodgerblue">※순환 참조가 생기거나, lazy하거나 optional 을 사용할 때 유용한 기능이다.</p>
+objectProvider 와 Provider 사용할 때의 결정은 스프링이 아닌 다른 컨테이너에서도 사용 할 수 있어야 한단 면 자바 표준의 Provider를 선호한다.
+<u>스프링 자체에서 @LookUp은 거의 지양한다.</u>
 
 
 

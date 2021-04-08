@@ -25,7 +25,7 @@ public class scopeUsingDouble {
 
         prototypeTest p2=ac.getBean(prototypeTest.class);
         p2.addCount();
-        Assertions.assertThat(p2.count).isEqualTo(2);
+        Assertions.assertThat(p2.count).isEqualTo(1);
     }
 
     @Test

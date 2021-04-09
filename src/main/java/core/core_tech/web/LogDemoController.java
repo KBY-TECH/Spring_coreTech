@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
 
 @RestController
-
 @RequiredArgsConstructor
 public class LogDemoController {
 //    private final ObjectProvider<MyLogger> provider;
@@ -19,7 +18,7 @@ public class LogDemoController {
     @ResponseBody
     public String lognerApiTest(HttpServletRequest request) throws InterruptedException {
         String s = request.getRequestURL().toString();
-        System.out.println("proxy -----> "+myLogger.getClass());
+//        System.out.println("proxy -----> "+myLogger.getClass());
 //        MyLogger myLogger=provider.getObject();
         myLogger.setRequestUrl(s);
         Thread.sleep(1000);

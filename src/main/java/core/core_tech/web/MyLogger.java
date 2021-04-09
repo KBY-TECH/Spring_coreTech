@@ -21,24 +21,18 @@ public class MyLogger {
 
     public void log(String msg)
     {
-        System.out.println("MyLogger.log");
-        System.out.println("uuid : "+this.uuid);
-        System.out.println("requestUrl : "+this.requestUrl);
-        System.out.println("msg : "+msg);
+        System.out.println("[uuid : "+this.uuid+"] [requestUrl : "+this.requestUrl+"]  [msg : "+msg);
     }
     @PostConstruct
     public void init()
     {
         uuid= UUID.randomUUID().toString();
-        System.out.println("MyLogger.init refAddress -> "+this);
-        System.out.println("uuid = " + uuid);
+        System.out.println("CREATE  [MyLogger.init refAddress : "+this+" ] [ uuid :"+uuid+" ]");
     }
 
     @PreDestroy
     public void close()
     {
-        System.out.println();
-        System.out.println("MyLogger.close ");
-        System.out.println("uuid = " + uuid+"  referAddress close : "+this) ;
+        System.out.println("\n CLOSEl  [ uuid : "+uuid+" ] \n");
     }
 }

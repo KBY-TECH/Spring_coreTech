@@ -857,9 +857,11 @@ __생성자는 안전하고 순수 자바 언어의 특징을 잘 살리는 방�
 -  프로토타입 빈은 프로토타입 빈을 조회한 클라이언트가 관리해야 한다.
 - 종료에 대한 호출은 클라이언트가 직접 해야 한다.
 
-
+---
 ## 프로토타입이 싱글톤 스코프 함께 사용시 문제점.
+
     프로토타입 : 요청 할 때마다 항상 새로운 개체 인스턴스를 생성해서 반환.
+
       싱글톤   : 요청 할 때마다 항상 똑같은 개체 인스턴스를 반환.
 
 
@@ -899,7 +901,7 @@ __생성자는 안전하고 순수 자바 언어의 특징을 잘 살리는 방�
     static class ClientBean{
         private final ObjectProvider<prototypeTest> prototypeTests; // getObject 메소드 하나만 제공.
         private final ObjectFactory<prototypeTest> prototypeTests2; // getObejct 기능의 get()메소드 외 다양하게 제공.
-        
+        private final Provider<prototypeBean> provider; // 자바 표준.
         @PostConstruct
         public void init(){
             System.out.println("single.init");
@@ -930,9 +932,109 @@ __생성자는 안전하고 순수 자바 언어의 특징을 잘 살리는 방�
 objectProvider 와 Provider 사용할 때의 결정은 스프링이 아닌 다른 컨테이너에서도 사용 할 수 있어야 한단 면 자바 표준의 Provider를 선호한다.
 <u>스프링 자체에서 @LookUp은 거의 지양한다.</u>
 
+---
 
+## 웹 스코프
 
+### 웹 스코프의 특징
     
+    - 웹 환경에서만 동작
+    - 종료 시점까지 관리한다.(프로토타입과는 다르다)
+<br>
+### 웹 스코프 종료
+    
+- request : 들어오고 나갈 때까지 유지되는 스코프, 각 요청마다 인스턴스 생성.
+- session : HTTP session과 동일한 생명주기를 가지는 스코프
+- application : 서블릿 컨텍스트와 동일한 생명주기를 가지는 스코프.
+- webSocket : 웹 소켓과 동일한 생명 주기를 가지는 스코프
+
+
+
+### request 스코프 사용 ( web계층 로거 사용 )
+<br>
+웹 스코프의 범위를 request로 하여 초기화 소멸 시점까지 모두 관리가 되므로 이전에 배운 초기화,종료 메소드를 활용하였다.
+원래 인터셉터 또는 필터 같은 곳에서 활용하는것이 가장 좋은 방법이지만 기본적인 차원에서의 예제이다.
+<br>
+
+```javascript
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import java.util.UUID;
+
+@Component
+@Scope(value = "request",proxyMode = ScopedProxyMode.TARGET_CLASS) //ObjectProvider 를 안쓰고 바로 의존성 주입받고 사용하는 방식. scope가 request 임에도 불구하고,
+public class MyLogger {
+
+    private String uuid;
+    private String requestUrl;
+
+    public void setRequestUrl(String requestUrl) {
+        this.requestUrl = requestUrl;
+    }
+
+    public void log(String msg)
+    {
+        System.out.println("[uuid : "+this.uuid+"] [requestUrl : "+this.requestUrl+"]  [msg : "+msg);
+    }
+    @PostConstruct
+    public void init()
+    {
+        uuid= UUID.randomUUID().toString();
+        System.out.println("CREATE  [MyLogger.init refAddress : "+this+" ] [ uuid :"+uuid+" ]");
+    }
+
+    @PreDestroy
+    public void close()
+    {
+        System.out.println("\n CLOSEl  [ uuid : "+uuid+" ] \n");
+    }
+}
+```
+
+<p style="color: indianred">하지만 실행과 동시에 사용자의 요청(request)이 없어 오류가 난다. 이 문제는 Provider로 임시적인 해결이 가능하다.</p>
+누군가에 의해 자동으로 주입되는 DI에 대한 오류로 인해 발생 한 것이기에 Mylogger를 직접 필요할 때 찾을 수 있는 LookUp을 할 수 있도록 하여 오류가 나지 않는다.
+
+
+※ 또한 Provider가 아닌 ProxyMode로 이 문제를 해결할 수 있다.<br>
+
+```javascript
+Scope(proxyMode = ScopedProxyMode.TARGET_CLASS) 
+```
+
+적용대상에 따라 TARGET.CLASS, INTEERFACE 를 선택할 수 있다.<br>
+
+가짜 프록시를 만들어두고 HTTP request와 상관 없이 가짜 프록시를 미리 주입해 두어 DI 과정에서 오류가 발생하지 않는다.<br>
+
+해당 객체의 참조값을 찍어보면 CGLI~~ 형식을 출력하는 것을 알 수 있다.<br>
+
+스프링 컨테이너는 CGLIB라는 바이트 코드를 조작하는 하이브러리를 사용해서, MYLogger를 상속받은 가짜 객체를 생성한다.
+
+![캡처](https://user-images.githubusercontent.com/67587446/114159613-ee5e4e00-9960-11eb-8fab-b2bbf39c625b.PNG)
+    
+클라이언트 입장에서는 이 객체가 진짜인지 가짜인지도 모른체 동일하게 할 수 있는 다형성의 특징을 갖는다.<br>
+
+
+#### 프록시의 동작원리
+
+- 진짜 객체 MyLooger가 가짜 객체를 주입한다.
+- 실제 요청시 내부에서 빈을 요청하는 위임 로직이 들어가 있다.
+- 가짜 프록시 객체는 실제 request scope와는 관계가 없으며, 내부에 단순한 위임 로직만 있고,싱글톤 처럼 동작한다.
+
+
+#### 특징 정리
+- 클라이언트는 싱글톤 빈을 사용하듯 편리하게 이용가능하다.
+- Provider ,Proxy 사용하든  핵심은 객체 조회를 <p style="color: cornflowerblue">꼭 필요한 시점까지 지연</p>하는 것이다.
+- 애노테이션의 설정 만으로 원본 객체를 가짜객체로 대체할 수 있는 것이 바로 다형성과 DI 컨테이너가 가진 핵심 가치이다.
+- 웹 스코프에만 적용하는 것은 아니다.
+
+#### 주의할 점
+- 싱글톤처럼 동작하는 것 같지만 다르게 동작할 경우를 알고 사용해야 한다.
+- 꼭 필요한 scope에만 최소한으로 사용한다. 무부분별한 사용은 독이 될 수 있다.
+
 
     
 
